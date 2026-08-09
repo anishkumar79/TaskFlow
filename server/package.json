@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js",
-    "start": "node index.js",
+    "start": "node consumer.js & node index.js",
     "consumer": "node consumer.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate"
