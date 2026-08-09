@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=taskflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    restart: always
+    command:
+      - redpanda start --overprovisioned --smp 1 --memory 512M --reserve-memory 0M
+        --node-id 0 --check=false --kafka-addr PLAINTEXT://0.0.0.0:9092
+        --advertise-kafka-addr PLAINTEXT://redpanda:9092
+    ports:
+      - "9092:9092"
+
+  api:
+    build: ./server
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/taskflow
+      - JWT_SECRET=change-this-to-a-long-random-string
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKER=redpanda:9092
+      - PORT=4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - db
+      - redis
+      - redpanda
+
+  notification-service:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.consumer
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/taskflow
+      - KAFKA_BROKER=redpanda:9092
+    depends_on:
+      - db
+      - redpanda
+      - api
+
+  client:
+    build: ./client
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
